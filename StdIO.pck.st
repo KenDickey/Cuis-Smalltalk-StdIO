@@ -1,6 +1,6 @@
-'From Cuis 4.2 of 25 July 2013 [latest update: #2658] on 24 January 2016 at 6:42:04.820472 pm'!
+'From Cuis 4.2 of 25 July 2013 [latest update: #2676] on 27 January 2016 at 11:57:52.273497 am'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 5!
+!provides: 'StdIO' 1 6!
 !classDefinition: #StdIOReadEvalPrint category: #StdIO!
 Object subclass: #StdIOReadEvalPrint
 	instanceVariableNames: 'stdin stdout'
@@ -40,13 +40,29 @@ x := 'foo'.
 x at: 3 put: $x.
 x!!
 fox
+ReadTo!!andPrint> Feature require: #'Morphic-ColorEditor'.!!
+Feature
 ReadTo!!andPrint> !!!!
 nil
 ----------------------------------
 The !!!! above exits!
 
 !StdIOFileStream commentStamp: '<historical>' prior: 0!
-Standard Input/Output/Error FileStreams!
+Standard Input/Output/Error FileStreams.
+
+See instance side of Class StdIOReadEvalPrint for usage example.
+
+
+A basic problem/restriction with this code is that currently the VM runs multiple VM threads within a single OS thread.
+
+This means that starting the REPL, even with #fork, BLOCKS THE VM while the VM's OS thread waits on input.
+
+This can be 'fixed' by spawning a 2nd OS thread to block on the stdio.  When that thread wakes up, it cah 'sholder tap' the squeak VM to update its state.  Then StdIO acts as Just abother device driver.
+
+The solution abive is not done at this time because the VM builders are already working on a general solution which will work with all FFI callbacks.  The general solution will allow multiple OS threads interacting with a single VM thread.
+
+We should adopt this solution when available.
+!
 
 !StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'KenD 1/24/2016 16:14'!
 initialize
