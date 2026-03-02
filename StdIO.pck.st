@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 27 February 2026 at 5:48:51 pm'!
+'From Cuis7.6 [latest update: #7777] on 2 March 2026 at 9:45:22 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 7!
+!provides: 'StdIO' 1 8!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -17,7 +17,7 @@ StdIOFileStream class
 
 !classDefinition: #StdIOReadEvalPrint category: #StdIO!
 Object subclass: #StdIOReadEvalPrint
-	instanceVariableNames: 'stdin stdout'
+	instanceVariableNames: 'stdin stdout delimiter running'
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'StdIO'!
@@ -132,26 +132,71 @@ stdoutHandle
 
 	^ self stdioHandles at: 2! !
 
-!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'KenD 24/Jan/2016 16:14:00'!
+!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 2/Mar/2026 21:15:44'!
 initialize
 
 	super initialize.
 	stdin := StdIOFileStream stdin.
 	stdout := StdIOFileStream stdout.
+       self delimiter.
+       running := false.
 	! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'KenD 24/Jan/2016 18:31:00'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 2/Mar/2026 21:40:44'!
+delimiter
+"Character to signal end of input. Default is $!!. Call delimiter: to change.
+Using anything outside of ASCII Basic Latin (codePoint 31-126) is unsafe. VM/Terminal may not pass the right value"
+    ^ delimiter ifNil: [delimiter := Character codePoint: 33]! !
+
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 2/Mar/2026 21:41:19'!
+delimiter: aCharacter
+"Character to signal end of input.
+Using anything outside of ASCII Basic Latin (codePoint 31-126) is unsafe. VM/Terminal may not pass the right value"
+    aCharacter isString ifTrue: [delimiter := aCharacter first. ^ self].
+    delimiter := aCharacter! !
+
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 2/Mar/2026 21:25:06'!
+helpText
+|characterString|
+    characterString := self delimiter asString.
+    ^ 'End Smalltalk espressions with ', characterString, 'and press enter to evaluate', 
+        Character newLineCharacter asString,
+        characterString, characterString, ' to close REPL' , Character newLineCharacter asString.! !
+
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 2/Mar/2026 21:26:36'!
+prompt
+"Edit this to customise the prompt"
+    ^ 'ReadTo', self delimiter asString, 'andPrint> '! !
+
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 27/Feb/2026 22:14:31'!
+quitSmalltalkOnClose
+"Todo: Figure out how to run headless
+Set to true to shutdown vm when REPL closes. Not critical when running in GUI mode."
+	^ false! !
+
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 2/Mar/2026 21:16:58'!
+running
+"For testing. True if within REPL loop"
+    ^ running! !
+
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 2/Mar/2026 21:18:17'!
 readEvalPrint
 	| line |
 	
-	[ line := self request: 'ReadTo!!andPrint> '.
+       self show: self helpText.
+       "Must be set immediately prior"
+	running := true.
+	[ line := self request: self prompt.
 	  line size = 0
 	] whileFalse: [
 		self show: ( [ Compiler evaluate: line ] ifError: [ :err :ex | err ] ).
 		self show: String newLineString.
-	]! !
+	].
+       "Must be set immediately after"
+       running := false.
+       self quitSmalltalkOnClose ifTrue: [Smalltalk quit]! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'KenD 24/Jan/2016 18:23:00'!
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 2/Mar/2026 21:18:33'!
 request: prompt
 	"Display prompt, gather text until CR"
 	| line char |
@@ -159,7 +204,7 @@ request: prompt
 	self show: prompt.
 	[true] whileTrue: [
 		char := stdin next.
-		(char = $!!) ifTrue: [ ^ line ].
+		(char = self delimiter) ifTrue: [ ^ line ].
 		line := line , char asString.
 	]! !
 
