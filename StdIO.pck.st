@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 4 March 2026 at 11:51:00 am'!
+'From Cuis7.6 [latest update: #7777] on 4 March 2026 at 10:56:53 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 8!
+!provides: 'StdIO' 1 9!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -17,7 +17,7 @@ StdIOFileStream class
 
 !classDefinition: #StdIOReadEvalPrint category: #StdIO!
 Object subclass: #StdIOReadEvalPrint
-	instanceVariableNames: 'stdin stdout delimiter running'
+	instanceVariableNames: 'stdIn stdOut terminator running readLine outputReady'
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'StdIO'!
@@ -147,54 +147,66 @@ stdoutHandle
 
 	^ self stdioHandles at: 2! !
 
-!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 2/Mar/2026 21:15:44'!
+!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 4/Mar/2026 22:17:03'!
 initialize
 
 	super initialize.
-	stdin := StdIOFileStream stdin.
-	stdout := StdIOFileStream stdout.
-       self delimiter.
+	
+	outputReady := false.
        running := false.
 	! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 2/Mar/2026 21:40:44'!
-delimiter
-"Character to signal end of input. Default is $!!. Call delimiter: to change.
-Using anything outside of ASCII Basic Latin (codePoint 31-126) is unsafe. VM/Terminal may not pass the right value"
-    ^ delimiter ifNil: [delimiter := Character codePoint: 33]! !
-
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 2/Mar/2026 21:41:19'!
-delimiter: aCharacter
-"Character to signal end of input.
-Using anything outside of ASCII Basic Latin (codePoint 31-126) is unsafe. VM/Terminal may not pass the right value"
-    aCharacter isString ifTrue: [delimiter := aCharacter first. ^ self].
-    delimiter := aCharacter! !
-
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 2/Mar/2026 21:25:06'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:56:57'!
 helpText
 |characterString|
-    characterString := self delimiter asString.
-    ^ 'End Smalltalk espressions with ', characterString, 'and press enter to evaluate', 
+    characterString := self terminator asString.
+    ^ 'End Smalltalk espressions with ', characterString, ' and press enter to evaluate', 
         Character newLineCharacter asString,
         characterString, characterString, ' to close REPL' , Character newLineCharacter asString.! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 2/Mar/2026 21:26:36'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 22:41:46'!
+outputReady
+"Hook for testing and debugging"
+	^ outputReady! !
+
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:26:11'!
 prompt
 "Edit this to customise the prompt"
-    ^ 'ReadTo', self delimiter asString, 'andPrint> '! !
+    ^ 'ReadTo', self terminator asString, 'andPrint> '! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 27/Feb/2026 22:14:31'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:33:34'!
 quitSmalltalkOnClose
 "Todo: Figure out how to run headless
 Set to true to shutdown vm when REPL closes. Not critical when running in GUI mode."
-	^ false! !
+	^ false | Smalltalk isHeadless! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 2/Mar/2026 21:16:58'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 22:42:13'!
 running
-"For testing. True if within REPL loop"
+"Hook for testing and debugging"
     ^ running! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 11:38:25'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:23:03'!
+stdIn: aFileStream
+	stdIn := aFileStream! !
+
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:23:07'!
+stdOut: aFileStream
+	stdOut := aFileStream! !
+
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:24:34'!
+terminator
+"Character to signal end of input. Default is $!!. Send terminator: to change.
+Using anything outside of ASCII Basic Latin (codePoint 31-126) is unsafe. VM/Terminal may not pass the right value"
+    ^ terminator ifNil: [terminator := Character codePoint: 33]! !
+
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:24:51'!
+terminator: aCharacter
+"Character to signal end of input.
+Using anything outside of ASCII Basic Latin (codePoint 31-126) is unsafe. VM/Terminal may not pass the right value"
+    aCharacter isString ifTrue: [terminator := aCharacter first. ^ self].
+    terminator := aCharacter! !
+
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 22:42:46'!
 readEvalPrint
 	| line |
 	
@@ -202,30 +214,42 @@ readEvalPrint
        "Must be set immediately prior"
 	running := true.
 	[ line := self request: self prompt.
+	  outputReady := false.
 	  line size = 0
 	] whileFalse: [
 		self show: ( [ Compiler evaluate: line ] ifError: [ :err :ex | err ] ).
 		self show: String newLineString.
+		outputReady := true.
 	].
        "Must be set immediately after"
        running := false.
-       stdout flush. self show: 'Exiting'. self show: String newLineString.
+       stdOut flush. self show: 'Exiting'. self show: String newLineString.
        self quitSmalltalkOnClose ifTrue: [Smalltalk quit]! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 10:51:45'!
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 22:53:26'!
 request: prompt
 	"Display prompt, gather text until CR"
 	| line char |
 	line := ''.
 	self show: prompt.
 	[true] whileTrue: [
-		char := stdin next.
+		char := stdIn next.
 		(char = $!!) ifTrue: [ ^ line ].
-		char ifNotNil: [line := line , char asString].
+		char ifNotNil: [readLine := line , char asString].
 		(Delay forMilliseconds: 50) wait.
 	]! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'KenD 24/Jan/2016 16:20:00'!
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 20:22:54'!
 show: anObject
 
-	stdout nextPutAll: anObject asString! !
+	stdOut nextPutAll: anObject asString! !
+
+!StdIOReadEvalPrint class methodsFor: 'instance creation' stamp: 'JZCH 4/Mar/2026 20:29:47'!
+newWithDefaults
+	| newInstance |
+	newInstance := self new.
+	newInstance stdIn: StdIOFileStream stdin.
+	newInstance stdOut: StdIOFileStream stdout.
+	newInstance terminator: $!!.
+	
+	^ newInstance! !
