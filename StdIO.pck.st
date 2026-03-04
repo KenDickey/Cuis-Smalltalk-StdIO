@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 27 February 2026 at 5:48:51 pm'!
+'From Cuis7.6 [latest update: #7777] on 4 March 2026 at 11:51:00 am'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 7!
+!provides: 'StdIO' 1 8!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -26,22 +26,20 @@ StdIOReadEvalPrint class
 	instanceVariableNames: ''!
 
 
-!StdIOFileStream commentStamp: '<historical>' prior: 0!
+!StdIOFileStream commentStamp: 'JZCH 4/Mar/2026 11:45:37' prior: 0!
 Standard Input/Output/Error FileStreams.
 
 See instance side of Class StdIOReadEvalPrint for usage example.
 
+For VMs on supported OS (currently only Unix and similar - linux and mac), stdin is non blocking when REPL is started with #fork.
+
+===
 
 A basic problem/restriction with this code is that currently the VM runs multiple VM threads within a single OS thread.
 
 This means that starting the REPL, even with #fork, BLOCKS THE VM while the VM's OS thread waits on input.
 
-This can be 'fixed' by spawning a 2nd OS thread to block on the stdio.  When that thread wakes up, it cah 'sholder tap' the squeak VM to update its state.  Then StdIO acts as Just abother device driver.
-
-The solution abive is not done at this time because the VM builders are already working on a general solution which will work with all FFI callbacks.  The general solution will allow multiple OS threads interacting with a single VM thread.
-
-We should adopt this solution when available.
-!
+This can be 'fixed' by spawning a 2nd OS thread to block on the stdio.  When that thread wakes up, it can 'sholder tap' the squeak VM to update its state.  Then StdIO acts as just another device driver.!
 
 !StdIOReadEvalPrint commentStamp: '<historical>' prior: 0!
 Very simple Red Eval Print Loop (REPL) for standard input & output..
@@ -68,6 +66,22 @@ nil
 ----------------------------------
 The !!!! above exits!
 
+!StdIOFileStream methodsFor: 'primitives' stamp: 'JZCH 4/Mar/2026 11:49:03'!
+primSQFileSetNonBlocking: aSQFileStruct
+	"Pass a struct SQFile on the stack, and call fcntl() to set the file non-blocking."
+	"This belongs higher on the inheritance hierarchy and should be removed when the feature is implemented in the Cuis base image."
+
+	<primitive: 'primitiveSQFileSetNonBlocking' module: 'UnixOSProcessPlugin'>
+	^ nil
+! !
+
+!StdIOFileStream methodsFor: 'primitives' stamp: 'JZCH 4/Mar/2026 11:49:07'!
+setNonBlocking
+	"Convert ioHandle to an SQFile data structure and call primitive to set it non-blocking."
+	"This belongs higher on the inheritance hierarchy and should be removed when the feature is implemented in the Cuis base image."
+
+	^ self primSQFileSetNonBlocking: fileID! !
+
 !StdIOFileStream methodsFor: 'file open/close' stamp: 'KenD 24/Jan/2016 16:04:00'!
 openOnHandle: aFileID name: streamName forWrite: writeMode
 	"Initialize the file with the given handle. If writeMode is true then
@@ -91,7 +105,7 @@ stderr
 		forWrite: true.
 	^newSelf! !
 
-!StdIOFileStream class methodsFor: 'instance creation' stamp: 'JZCH 27/Feb/2026 17:25:51'!
+!StdIOFileStream class methodsFor: 'instance creation' stamp: 'JZCH 4/Mar/2026 09:33:03'!
 stdin
 	| newSelf |
 	newSelf := self new useCharacters.
@@ -99,6 +113,7 @@ stdin
 		openOnHandle: self stdinHandle 
 		name: 'stdin'
 		forWrite: false.
+	newSelf setNonBlocking.
 	^newSelf! !
 
 !StdIOFileStream class methodsFor: 'instance creation' stamp: 'KenD 24/Jan/2016 16:07:00'!
@@ -140,7 +155,7 @@ initialize
 	stdout := StdIOFileStream stdout.
 	! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'KenD 24/Jan/2016 18:31:00'!
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 11:38:25'!
 readEvalPrint
 	| line |
 	
@@ -149,9 +164,10 @@ readEvalPrint
 	] whileFalse: [
 		self show: ( [ Compiler evaluate: line ] ifError: [ :err :ex | err ] ).
 		self show: String newLineString.
-	]! !
+	].
+	stdout flush. self show: 'Exiting'. self show: String newLineString.! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'KenD 24/Jan/2016 18:23:00'!
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 10:51:45'!
 request: prompt
 	"Display prompt, gather text until CR"
 	| line char |
@@ -160,7 +176,8 @@ request: prompt
 	[true] whileTrue: [
 		char := stdin next.
 		(char = $!!) ifTrue: [ ^ line ].
-		line := line , char asString.
+		char ifNotNil: [line := line , char asString].
+		(Delay forMilliseconds: 50) wait.
 	]! !
 
 !StdIOReadEvalPrint methodsFor: 'command line' stamp: 'KenD 24/Jan/2016 16:20:00'!
