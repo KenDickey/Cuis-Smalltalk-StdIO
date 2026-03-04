@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 4 March 2026 at 10:56:53 pm'!
+'From Cuis7.6 [latest update: #7777] on 4 March 2026 at 11:08:25 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 9!
+!provides: 'StdIO' 1 10!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -17,7 +17,7 @@ StdIOFileStream class
 
 !classDefinition: #StdIOReadEvalPrint category: #StdIO!
 Object subclass: #StdIOReadEvalPrint
-	instanceVariableNames: 'stdIn stdOut terminator running readLine outputReady'
+	instanceVariableNames: 'stdIn stdOut terminator running outputReady'
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'StdIO'!
@@ -226,7 +226,7 @@ readEvalPrint
        stdOut flush. self show: 'Exiting'. self show: String newLineString.
        self quitSmalltalkOnClose ifTrue: [Smalltalk quit]! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 22:53:26'!
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 23:07:34'!
 request: prompt
 	"Display prompt, gather text until CR"
 	| line char |
@@ -235,7 +235,7 @@ request: prompt
 	[true] whileTrue: [
 		char := stdIn next.
 		(char = $!!) ifTrue: [ ^ line ].
-		char ifNotNil: [readLine := line , char asString].
+		char ifNotNil: [line := line , char asString].
 		(Delay forMilliseconds: 50) wait.
 	]! !
 
