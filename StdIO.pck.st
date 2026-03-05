@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 5 March 2026 at 1:51:36 pm'!
+'From Cuis7.6 [latest update: #7777] on 5 March 2026 at 10:33:17 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 11!
+!provides: 'StdIO' 1 12!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -36,12 +36,12 @@ StdIOReadEvalPrint class
 	instanceVariableNames: ''!
 
 
-!StdIOFileStream commentStamp: 'JZCH 4/Mar/2026 11:45:37' prior: 0!
+!StdIOFileStream commentStamp: 'JZCH 5/Mar/2026 20:15:53' prior: 0!
 Standard Input/Output/Error FileStreams.
 
 See instance side of Class StdIOReadEvalPrint for usage example.
 
-For VMs on supported OS (currently only Unix and similar - linux and mac), stdin is non blocking when REPL is started with #fork.
+For VMs on supported OS (currently only Unix and similar - linux and mac), stdin is non blocking when #next is started with #fork and accompanied by Delay #wait.
 
 ===
 
@@ -51,8 +51,12 @@ This means that starting the REPL, even with #fork, BLOCKS THE VM while the VM's
 
 This can be 'fixed' by spawning a 2nd OS thread to block on the stdio.  When that thread wakes up, it can 'sholder tap' the squeak VM to update its state.  Then StdIO acts as just another device driver.!
 
-!StdIONonBlockingReadStream commentStamp: '<historical>' prior: 0!
-For VMs on supported OS (currently only Unix and similar - linux and mac), stdin is non blocking when method block is started within #fork and contains Delay #wait.!
+!StdIONonBlockingReadStream commentStamp: 'JZCH 5/Mar/2026 22:31:33' prior: 0!
+For VMs on supported OS (currently only Unix and similar - linux and mac), stdin is non blocking when method block is started within #fork and contains Delay #wait.
+
+===
+
+Modification to #privateRead works, needs more investigation regarding putting Character space into buffer instead of nil or null.!
 
 !StdIOReadEvalPrint commentStamp: '<historical>' prior: 0!
 Very simple Red Eval Print Loop (REPL) for standard input & output..
@@ -159,6 +163,14 @@ stdioHandles
 stdoutHandle
 
 	^ self stdioHandles at: 2! !
+
+!StdIONonBlockingReadStream methodsFor: 'streaming' stamp: 'JZCH 5/Mar/2026 21:44:29'!
+privateRead
+	"Read one Character.
+	Private."
+	| count |
+	count := self primRead: fileID into: buffer1 startingAt: 1 count: 1.
+	^count = 1 ifFalse: [ buffer1 at: 1 put: Character space ]! !
 
 !StdIONonBlockingReadStream methodsFor: 'primitives' stamp: 'JZCH 5/Mar/2026 13:29:15'!
 primSQFileSetNonBlocking: aSQFileStruct
@@ -276,11 +288,11 @@ show: anObject
 
 	stdOut nextPutAll: anObject asString! !
 
-!StdIOReadEvalPrint class methodsFor: 'instance creation' stamp: 'JZCH 5/Mar/2026 13:38:22'!
+!StdIOReadEvalPrint class methodsFor: 'instance creation' stamp: 'JZCH 5/Mar/2026 22:32:23'!
 newWithDefaults
 	| newInstance |
 	newInstance := self new.
-	newInstance stdIn: StdIONonBlockingReadStream stdin.
+	newInstance stdIn: StdIOFileStream stdin.
 	newInstance stdOut: StdIOWriteStream stdout.
 	newInstance terminator: $!!.
 	
