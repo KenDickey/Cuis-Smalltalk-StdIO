@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 4 March 2026 at 11:08:25 pm'!
+'From Cuis7.6 [latest update: #7777] on 5 March 2026 at 1:51:36 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 10!
+!provides: 'StdIO' 1 11!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -13,6 +13,16 @@ UniFileStream subclass: #StdIOFileStream
 	category: 'StdIO'!
 !classDefinition: 'StdIOFileStream class' category: #StdIO!
 StdIOFileStream class
+	instanceVariableNames: ''!
+
+!classDefinition: #StdIONonBlockingReadStream category: #StdIO!
+StdIOReadStream subclass: #StdIONonBlockingReadStream
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'StdIO'!
+!classDefinition: 'StdIONonBlockingReadStream class' category: #StdIO!
+StdIONonBlockingReadStream class
 	instanceVariableNames: ''!
 
 !classDefinition: #StdIOReadEvalPrint category: #StdIO!
@@ -40,6 +50,9 @@ A basic problem/restriction with this code is that currently the VM runs multipl
 This means that starting the REPL, even with #fork, BLOCKS THE VM while the VM's OS thread waits on input.
 
 This can be 'fixed' by spawning a 2nd OS thread to block on the stdio.  When that thread wakes up, it can 'sholder tap' the squeak VM to update its state.  Then StdIO acts as just another device driver.!
+
+!StdIONonBlockingReadStream commentStamp: '<historical>' prior: 0!
+For VMs on supported OS (currently only Unix and similar - linux and mac), stdin is non blocking when method block is started within #fork and contains Delay #wait.!
 
 !StdIOReadEvalPrint commentStamp: '<historical>' prior: 0!
 Very simple Red Eval Print Loop (REPL) for standard input & output..
@@ -147,6 +160,25 @@ stdoutHandle
 
 	^ self stdioHandles at: 2! !
 
+!StdIONonBlockingReadStream methodsFor: 'primitives' stamp: 'JZCH 5/Mar/2026 13:29:15'!
+primSQFileSetNonBlocking: aSQFileStruct
+	"Pass a struct SQFile on the stack, and call fcntl() to set the file non-blocking."
+	"This belongs higher on the inheritance hierarchy and should be removed when the feature is implemented in the Cuis base image."
+
+	<primitive: 'primitiveSQFileSetNonBlocking' module: 'UnixOSProcessPlugin'>
+	^ nil! !
+
+!StdIONonBlockingReadStream methodsFor: 'primitives' stamp: 'JZCH 5/Mar/2026 13:29:48'!
+setNonBlocking
+	"Convert ioHandle to an SQFile data structure and call primitive to set it non-blocking."
+	"This belongs higher on the inheritance hierarchy and should be removed when the feature is implemented in the Cuis base image."
+
+	^ self primSQFileSetNonBlocking: fileID! !
+
+!StdIONonBlockingReadStream class methodsFor: 'instance creation' stamp: 'JZCH 5/Mar/2026 13:34:40'!
+stdin
+	^ super stdin setNonBlocking; yourself! !
+
 !StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 4/Mar/2026 22:17:03'!
 initialize
 
@@ -244,12 +276,12 @@ show: anObject
 
 	stdOut nextPutAll: anObject asString! !
 
-!StdIOReadEvalPrint class methodsFor: 'instance creation' stamp: 'JZCH 4/Mar/2026 20:29:47'!
+!StdIOReadEvalPrint class methodsFor: 'instance creation' stamp: 'JZCH 5/Mar/2026 13:38:22'!
 newWithDefaults
 	| newInstance |
 	newInstance := self new.
-	newInstance stdIn: StdIOFileStream stdin.
-	newInstance stdOut: StdIOFileStream stdout.
+	newInstance stdIn: StdIONonBlockingReadStream stdin.
+	newInstance stdOut: StdIOWriteStream stdout.
 	newInstance terminator: $!!.
 	
 	^ newInstance! !
