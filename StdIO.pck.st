@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 6 March 2026 at 4:46:20 pm'!
+'From Cuis7.6 [latest update: #7777] on 6 March 2026 at 7:58:48 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 15!
+!provides: 'StdIO' 1 16!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -51,20 +51,20 @@ This means that starting the REPL, even with #fork, BLOCKS THE VM while the VM's
 
 This can be 'fixed' by spawning a 2nd OS thread to block on the stdio.  When that thread wakes up, it can 'sholder tap' the squeak VM to update its state.  Then StdIO acts as just another device driver.!
 
-!REPLSession commentStamp: 'JZCH 6/Mar/2026 15:54:59' prior: 0!
+!REPLSession commentStamp: '<historical>' prior: 0!
 I keep copies of inputs and outputs for StdIOReadEvalPrint.
 
 Outputs are returned as Smalltalk Objects and can be reused.
 
-Inputs can't be reused but can be filed out.
+Inputs are strings and can be filed out.
 !
 
-!StdIOReadEvalPrint commentStamp: 'JZCH 6/Mar/2026 16:44:21' prior: 0!
+!StdIOReadEvalPrint commentStamp: '<historical>' prior: 0!
 Very simple Red Eval Print Loop (REPL) for standard input & output.
 
 I respond to "#self".
 
-I keep a copy of previous inputs and outputs. Outputs can be reused, e.g. self previousOutput, self outputAt: 1.
+I keep a copy of previous inputs and outputs. Inputs can be rerun, e.g. self runPreviousInput, self runInputAt: 1. Outputs can be reused, e.g. self previousOutput, self outputAt: 1.
 
 [(StdIOReadEvalPrint newWithDefaults) readEvalPrint] fork. "Blocks image unless running on supported VM on Unix like process"
 ======
@@ -225,6 +225,11 @@ initialize
 	session := REPLSession new.
 	! !
 
+!StdIOReadEvalPrint methodsFor: 'private' stamp: 'JZCH 6/Mar/2026 19:55:51'!
+runInput: aString
+"Do not call this manually!!"
+	^ Compiler evaluate: aString for: self logged: false! !
+
 !StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 13:12:45'!
 endImmediately
 "Force stop the loop"
@@ -259,6 +264,16 @@ previousInput
 !StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 14:19:52'!
 previousOutput
 	^ session previousOutput! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 19:50:41'!
+runInputAt: index
+	^ self runInput: (self inputAt: index)
+	! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 19:51:03'!
+runPreviousInput
+	^ self runInput: self previousInput
+	! !
 
 !StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 15:44:53'!
 saveContents
@@ -329,7 +344,7 @@ doClosingActions
 	stdOut flush. self show: 'Exiting'. self show: String newLineString.
 	self quitSmalltalkOnClose ifTrue: [Smalltalk quit]! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 6/Mar/2026 14:32:46'!
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 6/Mar/2026 19:56:17'!
 readEvalPrint
 	| line output |
 	
@@ -340,7 +355,7 @@ readEvalPrint
 	  outputReady := false.
 	  line size = 0
 	] whileFalse: [
-		output := [ Compiler evaluate: line for: self logged: false] ifError: [ :err :ex | err ].
+		output := [ self runInput: line ] ifError: [ :err :ex | err ].
 		session addInput: line.
 		session addOutput: output.
 		self show: output.
