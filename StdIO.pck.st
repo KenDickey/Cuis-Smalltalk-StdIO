@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 5 March 2026 at 10:36:31 pm'!
+'From Cuis7.6 [latest update: #7777] on 6 March 2026 at 4:46:20 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 13!
+!provides: 'StdIO' 1 15!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -15,9 +15,19 @@ UniFileStream subclass: #StdIOFileStream
 StdIOFileStream class
 	instanceVariableNames: ''!
 
+!classDefinition: #REPLSession category: #StdIO!
+Object subclass: #REPLSession
+	instanceVariableNames: 'inputs outputs'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'StdIO'!
+!classDefinition: 'REPLSession class' category: #StdIO!
+REPLSession class
+	instanceVariableNames: ''!
+
 !classDefinition: #StdIOReadEvalPrint category: #StdIO!
 Object subclass: #StdIOReadEvalPrint
-	instanceVariableNames: 'stdIn stdOut terminator running outputReady'
+	instanceVariableNames: 'stdIn stdOut terminator running outputReady session'
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'StdIO'!
@@ -41,19 +51,29 @@ This means that starting the REPL, even with #fork, BLOCKS THE VM while the VM's
 
 This can be 'fixed' by spawning a 2nd OS thread to block on the stdio.  When that thread wakes up, it can 'sholder tap' the squeak VM to update its state.  Then StdIO acts as just another device driver.!
 
-!StdIOReadEvalPrint commentStamp: '<historical>' prior: 0!
-Very simple Red Eval Print Loop (REPL) for standard input & output..
+!REPLSession commentStamp: 'JZCH 6/Mar/2026 15:54:59' prior: 0!
+I keep copies of inputs and outputs for StdIOReadEvalPrint.
 
-Note also: Transcripter>>readEvalPrint.
+Outputs are returned as Smalltalk Objects and can be reused.
 
-[(StdIOReadEvalPrint new) readEvalPrint] fork. "Blocks image until done"
+Inputs can't be reused but can be filed out.
+!
+
+!StdIOReadEvalPrint commentStamp: 'JZCH 6/Mar/2026 16:44:21' prior: 0!
+Very simple Red Eval Print Loop (REPL) for standard input & output.
+
+I respond to "#self".
+
+I keep a copy of previous inputs and outputs. Outputs can be reused, e.g. self previousOutput, self outputAt: 1.
+
+[(StdIOReadEvalPrint newWithDefaults) readEvalPrint] fork. "Blocks image unless running on supported VM on Unix like process"
 ======
 Start Image from command line and invoke code above.
 ---------------------------------------------
-ReadTo!!andPrint> 23 + 4 * 7 / 3 !!
-63
-ReadTo!!andPrint> 23 + 4 * 7!!
+ReadTo!!andPrint> 23 + 4 * 7 !!
 189
+ReadTo!!andPrint> self previousOutput / 3 !!
+63
 ReadTo!!andPrint> | x |
 x := 'foo'.
 x at: 3 put: $x.
@@ -62,7 +82,6 @@ fox
 ReadTo!!andPrint> Feature require: #'Morphic-ColorEditor'.!!
 Feature
 ReadTo!!andPrint> !!!!
-nil
 ----------------------------------
 The !!!! above exits!
 
@@ -147,32 +166,131 @@ stdoutHandle
 
 	^ self stdioHandles at: 2! !
 
-!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 4/Mar/2026 22:17:03'!
-initialize
+!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 14:03:42'!
+addInput: anObject
+	^ inputs add: anObject! !
 
+!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 14:03:39'!
+addOutput: anObject
+	^ outputs add: anObject! !
+
+!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 15:20:52'!
+currentIndex
+"This is the one we care about"
+	^ outputs size + 1! !
+
+!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 14:15:51'!
+inputAt: index
+	^ [ inputs at: index ] ifError: [:err :ex | 'Invalid index' ]! !
+
+!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 14:16:05'!
+outputAt: index
+	^ [ outputs at: index ] ifError: [:err :ex | 'Invalid index' ]! !
+
+!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 14:12:56'!
+previousInput
+	inputs size = 0 ifTrue: [^ nil].
+	^ inputs last! !
+
+!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 14:12:58'!
+previousOutput
+	outputs size = 0 ifTrue: [^ nil].
+	^ outputs last! !
+
+!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 16:35:09'!
+saveContentsOn: aStream
+	self currentIndex < 2 ifTrue: [^ self].
+	
+	1 to: self currentIndex - 1 do: [:index |
+		aStream nextPutAll: (index asString , ' :').
+		aStream newLine.
+		aStream nextPutAll: (inputs at: index) asString.
+		aStream newLine; nextPutAll: '-----'; newLine.
+		aStream nextPutAll: (outputs at: index) asString.
+		aStream newLine; nextPutAll: '====='.
+		aStream newLine.]! !
+
+!REPLSession methodsFor: 'initialization' stamp: 'JZCH 6/Mar/2026 14:01:53'!
+initialize
+	super initialize.
+	inputs := OrderedCollection new.
+	outputs := OrderedCollection new.! !
+
+!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 6/Mar/2026 14:04:04'!
+initialize
 	super initialize.
 	
 	outputReady := false.
        running := false.
+	session := REPLSession new.
 	! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:56:57'!
-helpText
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 13:12:45'!
+endImmediately
+"Force stop the loop"
+	running := false.
+	^ 'Loop force stopped - should use double terminator during normal use instead'! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 13:22:10'!
+help
+"Show help text"
 |characterString|
     characterString := self terminator asString.
-    ^ 'End Smalltalk espressions with ', characterString, ' and press enter to evaluate', 
-        Character newLineCharacter asString,
-        characterString, characterString, ' to close REPL' , Character newLineCharacter asString.! !
+    ^ 
+	'End Smalltalk espressions with ' , characterString , ' and press enter to evaluate' , 
+	Character newLineCharacter asString ,
+	characterString , characterString , ' to close REPL' , 
+	Character newLineCharacter asString ,
+	'Enter "self help!!" to show this message' ,
+	Character newLineCharacter asString! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 14:19:23'!
+inputAt: index
+	^ session inputAt: index! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 14:19:32'!
+outputAt: index
+	^ session outputAt: index! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 14:19:44'!
+previousInput
+	^ session previousInput! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 14:19:52'!
+previousOutput
+	^ session previousOutput! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 15:44:53'!
+saveContents
+"Saves the inputs and outputs to a file"
+	| fileName |
+	fileName := 'Session: ' , DateAndTime now asString.
+	
+	self saveContentsTo: fileName asFileEntry.
+	^ 'Saved to ' , fileName asString! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 16:31:18'!
+saveContentsTo: aFileEntry
+"Saves the contents to the given filename"
+
+	aFileEntry writeStreamDo: [ :fileStream |
+		fileStream ifNotNil: [ 
+			session saveContentsOn: fileStream ]].
+	^ 'Saved to ' , aFileEntry asString! !
+
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 15:11:21'!
+currentIndex
+	^ session currentIndex! !
 
 !StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 22:41:46'!
 outputReady
 "Hook for testing and debugging"
 	^ outputReady! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:26:11'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 15:11:26'!
 prompt
 "Edit this to customise the prompt"
-    ^ 'ReadTo', self terminator asString, 'andPrint> '! !
+    ^ self currentIndex asString, ' ', self terminator asString, '> '! !
 
 !StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:33:34'!
 quitSmalltalkOnClose
@@ -206,25 +324,33 @@ Using anything outside of ASCII Basic Latin (codePoint 31-126) is unsafe. VM/Ter
     aCharacter isString ifTrue: [terminator := aCharacter first. ^ self].
     terminator := aCharacter! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 22:42:46'!
+!StdIOReadEvalPrint methodsFor: 'finalization' stamp: 'JZCH 6/Mar/2026 11:57:27'!
+doClosingActions
+	stdOut flush. self show: 'Exiting'. self show: String newLineString.
+	self quitSmalltalkOnClose ifTrue: [Smalltalk quit]! !
+
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 6/Mar/2026 14:32:46'!
 readEvalPrint
-	| line |
+	| line output |
 	
-       self show: self helpText.
+       self show: self help.
        "Must be set immediately prior"
 	running := true.
 	[ line := self request: self prompt.
 	  outputReady := false.
 	  line size = 0
 	] whileFalse: [
-		self show: ( [ Compiler evaluate: line ] ifError: [ :err :ex | err ] ).
+		output := [ Compiler evaluate: line for: self logged: false] ifError: [ :err :ex | err ].
+		session addInput: line.
+		session addOutput: output.
+		self show: output.
 		self show: String newLineString.
 		outputReady := true.
+		self running ifFalse: [ ^ self doClosingActions "Being forced to end"].
 	].
        "Must be set immediately after"
        running := false.
-       stdOut flush. self show: 'Exiting'. self show: String newLineString.
-       self quitSmalltalkOnClose ifTrue: [Smalltalk quit]! !
+       self doClosingActions.! !
 
 !StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 23:07:34'!
 request: prompt
