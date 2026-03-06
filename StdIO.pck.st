@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 5 March 2026 at 10:36:31 pm'!
+'From Cuis7.6 [latest update: #7777] on 6 March 2026 at 1:26:25 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 13!
+!provides: 'StdIO' 1 14!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -147,22 +147,32 @@ stdoutHandle
 
 	^ self stdioHandles at: 2! !
 
-!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 4/Mar/2026 22:17:03'!
+!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 6/Mar/2026 13:14:05'!
 initialize
-
 	super initialize.
 	
 	outputReady := false.
        running := false.
 	! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:56:57'!
-helpText
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 13:12:45'!
+endImmediately
+"Force stop the loop"
+	running := false.
+	^ 'Loop force stopped - should use double terminator during normal use instead'! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 13:22:10'!
+help
+"Show help text"
 |characterString|
     characterString := self terminator asString.
-    ^ 'End Smalltalk espressions with ', characterString, ' and press enter to evaluate', 
-        Character newLineCharacter asString,
-        characterString, characterString, ' to close REPL' , Character newLineCharacter asString.! !
+    ^ 
+	'End Smalltalk espressions with ' , characterString , ' and press enter to evaluate' , 
+	Character newLineCharacter asString ,
+	characterString , characterString , ' to close REPL' , 
+	Character newLineCharacter asString ,
+	'Enter "self help!!" to show this message' ,
+	Character newLineCharacter asString! !
 
 !StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 22:41:46'!
 outputReady
@@ -206,25 +216,30 @@ Using anything outside of ASCII Basic Latin (codePoint 31-126) is unsafe. VM/Ter
     aCharacter isString ifTrue: [terminator := aCharacter first. ^ self].
     terminator := aCharacter! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 22:42:46'!
+!StdIOReadEvalPrint methodsFor: 'finalization' stamp: 'JZCH 6/Mar/2026 11:57:27'!
+doClosingActions
+	stdOut flush. self show: 'Exiting'. self show: String newLineString.
+	self quitSmalltalkOnClose ifTrue: [Smalltalk quit]! !
+
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 6/Mar/2026 13:11:11'!
 readEvalPrint
 	| line |
 	
-       self show: self helpText.
+       self show: self help.
        "Must be set immediately prior"
 	running := true.
 	[ line := self request: self prompt.
 	  outputReady := false.
 	  line size = 0
 	] whileFalse: [
-		self show: ( [ Compiler evaluate: line ] ifError: [ :err :ex | err ] ).
+		self show: ( [ Compiler evaluate: line for: self logged: false] ifError: [ :err :ex | err ] ).
 		self show: String newLineString.
 		outputReady := true.
+		self running ifFalse: [ ^ self doClosingActions "Being forced to end"].
 	].
        "Must be set immediately after"
        running := false.
-       stdOut flush. self show: 'Exiting'. self show: String newLineString.
-       self quitSmalltalkOnClose ifTrue: [Smalltalk quit]! !
+       self doClosingActions.! !
 
 !StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 23:07:34'!
 request: prompt
