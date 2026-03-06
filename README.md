@@ -15,5 +15,6 @@ REPL instance responds to #self.
   self help "Shows a help message"
   self previousOutput. self outputAt: aNumber "Retrieve an answer that can be interacted with as a Smalltalk object"
   self previousInput. self inputAt: aNumber "Retrieve an input as string"
+  self runPreviousInput. self runInputAt: aNumber "Rerun a previous input"
   self saveContents. self saveContentsTo: aString asFileEntry "Save current REPL session input and output strings to file"
 ````
