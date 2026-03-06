@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 6 March 2026 at 1:28:02 pm'!
+'From Cuis7.6 [latest update: #7777] on 6 March 2026 at 4:48:14 pm'!
 'Description '!
-!provides: 'Tests-StdIO' 1 1!
+!provides: 'Tests-StdIO' 1 2!
 !requires: 'StdIO' 1 9 nil!
 SystemOrganization addCategory: #'Tests-StdIO'!
 
@@ -52,6 +52,21 @@ testEndImmediately
 	[repl running] whileTrue: [(Delay forMilliseconds: 5) wait.].
 	
 	self assert: [repl running not].! !
+
+!StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 6/Mar/2026 15:28:52'!
+testReuseOutput
+"Outputs can be retrieved and used as Smalltalk Objects not just a string"
+	| answer |
+	input nextPutAll: 
+	'1!!
+	(self previousOutput) + 1!!
+	'.
+	
+	input reset.
+	[ answer := repl outputAt: 2.
+	  answer isNumber ] whileFalse: [(Delay forMilliseconds: 5) wait.].
+	
+	self assert: (answer = 2).! !
 
 !StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 6/Mar/2026 12:42:03'!
 testSingleTerminator
