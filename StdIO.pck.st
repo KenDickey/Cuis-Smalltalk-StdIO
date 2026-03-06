@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 6 March 2026 at 7:58:48 pm'!
+'From Cuis7.6 [latest update: #7777] on 6 March 2026 at 9:15:38 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 16!
+!provides: 'StdIO' 1 17!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -230,63 +230,89 @@ runInput: aString
 "Do not call this manually!!"
 	^ Compiler evaluate: aString for: self logged: false! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 13:12:45'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 21:13:24'!
+commands
+"Returns a list of my commands intended for the REPL"
+	| pragmas selectors return count |
+	
+	pragmas := Pragma allNamed: #stdioreplcommand in: self class.
+	selectors := pragmas collect: [:aPragma | aPragma selector].
+	return := ''.
+	count := 0.
+	selectors do: [:selector | 
+		count := count + 1.
+		return := return , selector , ' '.
+		count = 5 ifTrue:[
+			return := return , Character lf asString.
+			count := 0]].
+	^ return! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 21:01:20'!
 endImmediately
 "Force stop the loop"
+
 	running := false.
 	^ 'Loop force stopped - should use double terminator during normal use instead'! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 13:22:10'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 21:14:20'!
 help
 "Show help text"
-|characterString|
-    characterString := self terminator asString.
-    ^ 
+	|characterString|
+	characterString := self terminator asString.
+    	^ 
 	'End Smalltalk espressions with ' , characterString , ' and press enter to evaluate' , 
 	Character newLineCharacter asString ,
 	characterString , characterString , ' to close REPL' , 
 	Character newLineCharacter asString ,
-	'Enter "self help!!" to show this message' ,
+	'Enter "self help!!" to show this message, "self commands!!" for a list of commands'  ,
 	Character newLineCharacter asString! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 14:19:23'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:52:53'!
 inputAt: index
+<stdioreplcommand>
 	^ session inputAt: index! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 14:19:32'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:53:04'!
 outputAt: index
+<stdioreplcommand>
 	^ session outputAt: index! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 14:19:44'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:53:08'!
 previousInput
+<stdioreplcommand>
 	^ session previousInput! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 14:19:52'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:53:11'!
 previousOutput
+<stdioreplcommand>
 	^ session previousOutput! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 19:50:41'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:53:15'!
 runInputAt: index
+<stdioreplcommand>
 	^ self runInput: (self inputAt: index)
 	! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 19:51:03'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:53:22'!
 runPreviousInput
+<stdioreplcommand>
 	^ self runInput: self previousInput
 	! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 15:44:53'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:53:32'!
 saveContents
 "Saves the inputs and outputs to a file"
+	<stdioreplcommand>
 	| fileName |
 	fileName := 'Session: ' , DateAndTime now asString.
 	
 	self saveContentsTo: fileName asFileEntry.
 	^ 'Saved to ' , fileName asString! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 16:31:18'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:53:40'!
 saveContentsTo: aFileEntry
 "Saves the contents to the given filename"
+<stdioreplcommand>
 
 	aFileEntry writeStreamDo: [ :fileStream |
 		fileStream ifNotNil: [ 
