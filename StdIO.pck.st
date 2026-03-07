@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 6 March 2026 at 9:15:38 pm'!
+'From Cuis7.6 [latest update: #7777] on 7 March 2026 at 4:31:28 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 17!
+!provides: 'StdIO' 1 18!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -27,7 +27,7 @@ REPLSession class
 
 !classDefinition: #StdIOReadEvalPrint category: #StdIO!
 Object subclass: #StdIOReadEvalPrint
-	instanceVariableNames: 'stdIn stdOut terminator running outputReady session'
+	instanceVariableNames: 'stdInPrivateNoREPL stdOutPrivateNoREPL terminatorPrivateNoREPL runningPrivateNoREPL outputReadyPrivateNoREPL sessionPrivateNoREPL'
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'StdIO'!
@@ -216,45 +216,52 @@ initialize
 	inputs := OrderedCollection new.
 	outputs := OrderedCollection new.! !
 
-!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 6/Mar/2026 14:04:04'!
+!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 7/Mar/2026 15:57:31'!
 initialize
 	super initialize.
 	
-	outputReady := false.
-       running := false.
-	session := REPLSession new.
+	outputReadyPrivateNoREPL := false.
+       runningPrivateNoREPL := false.
+	sessionPrivateNoREPL := REPLSession new.
 	! !
+
+!StdIOReadEvalPrint methodsFor: 'private' stamp: 'JZCH 7/Mar/2026 16:19:21'!
+printWrapped: aCollectionOfStrings every: aNumber
+"Terminal may not auto wrap output."
+	| count return |
+	count := 0.
+	return := ''.
+	aCollectionOfStrings do: [:aString | 
+		count = aNumber ifTrue: [
+			return := return , Character lf asString.
+			count := 0].
+		count := count + 1.
+		return := return , aString , ' '.
+	].
+	^ return! !
 
 !StdIOReadEvalPrint methodsFor: 'private' stamp: 'JZCH 6/Mar/2026 19:55:51'!
 runInput: aString
 "Do not call this manually!!"
 	^ Compiler evaluate: aString for: self logged: false! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 21:13:24'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 16:27:00'!
 commands
 "Returns a list of my commands intended for the REPL"
-	| pragmas selectors return count |
+	| pragmas selectors |
 	
 	pragmas := Pragma allNamed: #stdioreplcommand in: self class.
 	selectors := pragmas collect: [:aPragma | aPragma selector].
-	return := ''.
-	count := 0.
-	selectors do: [:selector | 
-		count := count + 1.
-		return := return , selector , ' '.
-		count = 5 ifTrue:[
-			return := return , Character lf asString.
-			count := 0]].
-	^ return! !
+	^ self printWrapped: selectors every: 5! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 21:01:20'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 15:57:15'!
 endImmediately
 "Force stop the loop"
 
-	running := false.
+	runningPrivateNoREPL := false.
 	^ 'Loop force stopped - should use double terminator during normal use instead'! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 21:14:20'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 16:10:43'!
 help
 "Show help text"
 	|characterString|
@@ -267,25 +274,34 @@ help
 	'Enter "self help!!" to show this message, "self commands!!" for a list of commands'  ,
 	Character newLineCharacter asString! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:52:53'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 15:57:31'!
 inputAt: index
 <stdioreplcommand>
-	^ session inputAt: index! !
+	^ sessionPrivateNoREPL inputAt: index! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:53:04'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 15:57:31'!
 outputAt: index
 <stdioreplcommand>
-	^ session outputAt: index! !
+	^ sessionPrivateNoREPL outputAt: index! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:53:08'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 15:57:31'!
 previousInput
 <stdioreplcommand>
-	^ session previousInput! !
+	^ sessionPrivateNoREPL previousInput! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:53:11'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 15:57:31'!
 previousOutput
 <stdioreplcommand>
-	^ session previousOutput! !
+	^ sessionPrivateNoREPL previousOutput! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 16:26:22'!
+privateVariables
+	<stdioreplcommand>
+	^ 
+'As the REPL is accessible via "self", all instance variables of the REPL are also accessible.
+You should not need to read them directly. You should definitely not change them from the REPL.
+They are deliberately named contrary to Smalltalk convention to prevent accidental conflicts:' , 
+String newLineString , (self printWrapped: (self class instVarNames) every: 5)! !
 
 !StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:53:15'!
 runInputAt: index
@@ -309,24 +325,24 @@ saveContents
 	self saveContentsTo: fileName asFileEntry.
 	^ 'Saved to ' , fileName asString! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:53:40'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 15:57:31'!
 saveContentsTo: aFileEntry
 "Saves the contents to the given filename"
 <stdioreplcommand>
 
 	aFileEntry writeStreamDo: [ :fileStream |
 		fileStream ifNotNil: [ 
-			session saveContentsOn: fileStream ]].
+			sessionPrivateNoREPL saveContentsOn: fileStream ]].
 	^ 'Saved to ' , aFileEntry asString! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 15:11:21'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 7/Mar/2026 15:57:31'!
 currentIndex
-	^ session currentIndex! !
+	^ sessionPrivateNoREPL currentIndex! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 22:41:46'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 7/Mar/2026 15:56:02'!
 outputReady
 "Hook for testing and debugging"
-	^ outputReady! !
+	^ outputReadyPrivateNoREPL! !
 
 !StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 15:11:26'!
 prompt
@@ -339,77 +355,77 @@ quitSmalltalkOnClose
 Set to true to shutdown vm when REPL closes. Not critical when running in GUI mode."
 	^ false | Smalltalk isHeadless! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 22:42:13'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 7/Mar/2026 15:57:15'!
 running
 "Hook for testing and debugging"
-    ^ running! !
+    ^ runningPrivateNoREPL! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:23:03'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 7/Mar/2026 15:57:45'!
 stdIn: aFileStream
-	stdIn := aFileStream! !
+	stdInPrivateNoREPL := aFileStream! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:23:07'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 7/Mar/2026 15:57:57'!
 stdOut: aFileStream
-	stdOut := aFileStream! !
+	stdOutPrivateNoREPL := aFileStream! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:24:34'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 7/Mar/2026 15:58:06'!
 terminator
 "Character to signal end of input. Default is $!!. Send terminator: to change.
 Using anything outside of ASCII Basic Latin (codePoint 31-126) is unsafe. VM/Terminal may not pass the right value"
-    ^ terminator ifNil: [terminator := Character codePoint: 33]! !
+    ^ terminatorPrivateNoREPL ifNil: [terminatorPrivateNoREPL := Character codePoint: 33]! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:24:51'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 7/Mar/2026 15:58:06'!
 terminator: aCharacter
 "Character to signal end of input.
 Using anything outside of ASCII Basic Latin (codePoint 31-126) is unsafe. VM/Terminal may not pass the right value"
-    aCharacter isString ifTrue: [terminator := aCharacter first. ^ self].
-    terminator := aCharacter! !
+    aCharacter isString ifTrue: [terminatorPrivateNoREPL := aCharacter first. ^ self].
+    terminatorPrivateNoREPL := aCharacter! !
 
-!StdIOReadEvalPrint methodsFor: 'finalization' stamp: 'JZCH 6/Mar/2026 11:57:27'!
+!StdIOReadEvalPrint methodsFor: 'finalization' stamp: 'JZCH 7/Mar/2026 15:57:57'!
 doClosingActions
-	stdOut flush. self show: 'Exiting'. self show: String newLineString.
+	stdOutPrivateNoREPL flush. self show: 'Exiting'. self show: String newLineString.
 	self quitSmalltalkOnClose ifTrue: [Smalltalk quit]! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 6/Mar/2026 19:56:17'!
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 7/Mar/2026 15:57:31'!
 readEvalPrint
 	| line output |
 	
        self show: self help.
        "Must be set immediately prior"
-	running := true.
+	runningPrivateNoREPL := true.
 	[ line := self request: self prompt.
-	  outputReady := false.
+	  outputReadyPrivateNoREPL := false.
 	  line size = 0
 	] whileFalse: [
 		output := [ self runInput: line ] ifError: [ :err :ex | err ].
-		session addInput: line.
-		session addOutput: output.
+		sessionPrivateNoREPL addInput: line.
+		sessionPrivateNoREPL addOutput: output.
 		self show: output.
 		self show: String newLineString.
-		outputReady := true.
+		outputReadyPrivateNoREPL := true.
 		self running ifFalse: [ ^ self doClosingActions "Being forced to end"].
 	].
        "Must be set immediately after"
-       running := false.
+       runningPrivateNoREPL := false.
        self doClosingActions.! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 23:07:34'!
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 7/Mar/2026 15:57:45'!
 request: prompt
 	"Display prompt, gather text until CR"
 	| line char |
 	line := ''.
 	self show: prompt.
 	[true] whileTrue: [
-		char := stdIn next.
+		char := stdInPrivateNoREPL next.
 		(char = $!!) ifTrue: [ ^ line ].
 		char ifNotNil: [line := line , char asString].
 		(Delay forMilliseconds: 50) wait.
 	]! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 4/Mar/2026 20:22:54'!
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 7/Mar/2026 15:57:57'!
 show: anObject
 
-	stdOut nextPutAll: anObject asString! !
+	stdOutPrivateNoREPL nextPutAll: anObject asString! !
 
 !StdIOReadEvalPrint class methodsFor: 'instance creation' stamp: 'JZCH 5/Mar/2026 22:32:23'!
 newWithDefaults
