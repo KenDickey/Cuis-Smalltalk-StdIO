@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 7 March 2026 at 10:31:22 pm'!
+'From Cuis7.6 [latest update: #7777] on 8 March 2026 at 9:58:42 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 21!
+!provides: 'StdIO' 1 23!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -17,7 +17,7 @@ StdIOFileStream class
 
 !classDefinition: #REPLSession category: #StdIO!
 Object subclass: #REPLSession
-	instanceVariableNames: 'inputs outputs sharedVariables'
+	instanceVariableNames: 'inputs outputs sharedVariables repl'
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'StdIO'!
@@ -173,36 +173,133 @@ stdoutHandle
 
 	^ self stdioHandles at: 2! !
 
-!REPLSession methodsFor: 'binding' stamp: 'JZCH 7/Mar/2026 21:07:08'!
+!REPLSession methodsFor: 'binding' stamp: 'JZCH 8/Mar/2026 20:57:12'!
 assignTo: aName value: aValue
+	<stdioreplcommand>
 	aName isSymbol ifFalse: [^ self error: 'Name shared variables with a #Symbol'].
 	^ sharedVariables at: aName put: aValue! !
 
-!REPLSession methodsFor: 'binding' stamp: 'JZCH 7/Mar/2026 21:04:50'!
+!REPLSession methodsFor: 'binding' stamp: 'JZCH 8/Mar/2026 20:57:16'!
 declare: aName
+	<stdioreplcommand>
 	^ self assignTo: aName value: nil! !
 
-!REPLSession methodsFor: 'binding' stamp: 'JZCH 7/Mar/2026 20:30:02'!
+!REPLSession methodsFor: 'binding' stamp: 'JZCH 8/Mar/2026 20:57:20'!
 hasDeclared: aName
+	<stdioreplcommand>
 	^ sharedVariables includesKey: aName! !
 
-!REPLSession methodsFor: 'binding' stamp: 'JZCH 7/Mar/2026 20:34:20'!
+!REPLSession methodsFor: 'binding' stamp: 'JZCH 8/Mar/2026 20:57:24'!
 sharedVariables
+	<stdioreplcommand>
 	^ sharedVariables keys! !
 
-!REPLSession methodsFor: 'binding' stamp: 'JZCH 7/Mar/2026 20:36:34'!
+!REPLSession methodsFor: 'binding' stamp: 'JZCH 8/Mar/2026 20:57:27'!
 sharedVariablesDo: aBlock
+	<stdioreplcommand>
 	sharedVariables keysDo: aBlock! !
 
-!REPLSession methodsFor: 'binding' stamp: 'JZCH 7/Mar/2026 20:36:10'!
+!REPLSession methodsFor: 'binding' stamp: 'JZCH 8/Mar/2026 20:57:31'!
 valueOf: aName
+	<stdioreplcommand>
 	^ sharedVariables at: aName! !
 
-!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 14:03:42'!
+!REPLSession methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 21:04:58'!
+commands
+"Returns a list of my commands"
+	<stdioreplcommand>
+	| pragmas selectors |
+	
+	pragmas := Pragma allNamed: #stdioreplcommand in: self class.
+	selectors := pragmas collect: [:aPragma | aPragma selector].
+	^ self repl printWrapped: selectors every: 5! !
+
+!REPLSession methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 21:41:33'!
+help
+"Show help text"
+	<stdioreplcommand>
+    	^ 
+'Session Manager. Access inputs and outputs. Declare and reuse shared variables.
+Save session to file.
+
+Usage:
+	self sn <command>
+
+Commands:
+	help 				show this text
+	commands 			list my commands     	
+
+IO:
+	previousInput 			last input
+	inputAt:			input at index
+	previousOutput 			last output
+	outputAt: 			output at index
+
+Saving:
+	saveContents 			save session to text file
+	saveContentsTo: 		save session to a file 
+					Example: self sn saveContentsTo: ''session'' asFileEntry
+
+Shared Variables - names must be #Symbols
+	declare: 			put nil at #name
+	hasDeclared: 			return true if #name exists
+	assignTo:value: 		assign to #name a value
+	valueOf: 			retrieve value of #name
+	sharedVariables 		list of shared variables
+	sharedVariablesDo: 		do a block for each #name
+'! !
+
+!REPLSession methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 20:58:51'!
+inputAt: index
+"Code at"
+	<stdioreplcommand>
+	^ [ inputs at: index ] ifError: [:err :ex | 'Invalid index' ]! !
+
+!REPLSession methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 20:58:46'!
+outputAt: index
+"Object at"
+	<stdioreplcommand>
+	^ [ outputs at: index ] ifError: [:err :ex | 'Invalid index' ]! !
+
+!REPLSession methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 20:58:36'!
+previousInput
+"The code evaluated for previous input"
+	<stdioreplcommand>
+	inputs size = 0 ifTrue: [^ nil].
+	^ inputs last! !
+
+!REPLSession methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 20:58:21'!
+previousOutput
+"The object returned for previous input"
+	<stdioreplcommand>
+	outputs size = 0 ifTrue: [^ nil].
+	^ outputs last! !
+
+!REPLSession methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 20:42:38'!
+saveContents
+"Saves the inputs and outputs to a file"
+	<stdioreplcommand>
+	| fileName |
+	fileName := 'Session: ' , DateAndTime now asString.
+	
+	self saveContentsTo: fileName asFileEntry.
+	^ 'Saved to ' , fileName asString! !
+
+!REPLSession methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 20:43:00'!
+saveContentsTo: aFileEntry
+"Saves the contents to the given filename"
+	<stdioreplcommand>
+
+	aFileEntry writeStreamDo: [ :fileStream |
+		fileStream ifNotNil: [ 
+			self saveContentsOn: fileStream ]].
+	^ 'Saved to ' , aFileEntry asString! !
+
+!REPLSession methodsFor: 'accessing' stamp: 'JZCH 8/Mar/2026 20:48:57'!
 addInput: anObject
 	^ inputs add: anObject! !
 
-!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 14:03:39'!
+!REPLSession methodsFor: 'accessing' stamp: 'JZCH 8/Mar/2026 20:48:52'!
 addOutput: anObject
 	^ outputs add: anObject! !
 
@@ -211,25 +308,15 @@ currentIndex
 "This is the one we care about"
 	^ outputs size + 1! !
 
-!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 14:15:51'!
-inputAt: index
-	^ [ inputs at: index ] ifError: [:err :ex | 'Invalid index' ]! !
+!REPLSession methodsFor: 'accessing' stamp: 'JZCH 8/Mar/2026 20:56:05'!
+repl
+	^ repl! !
 
-!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 14:16:05'!
-outputAt: index
-	^ [ outputs at: index ] ifError: [:err :ex | 'Invalid index' ]! !
+!REPLSession methodsFor: 'accessing' stamp: 'JZCH 8/Mar/2026 20:55:54'!
+repl: selfContext
+	repl := selfContext! !
 
-!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 14:12:56'!
-previousInput
-	inputs size = 0 ifTrue: [^ nil].
-	^ inputs last! !
-
-!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 14:12:58'!
-previousOutput
-	outputs size = 0 ifTrue: [^ nil].
-	^ outputs last! !
-
-!REPLSession methodsFor: 'accessing' stamp: 'JZCH 6/Mar/2026 16:35:09'!
+!REPLSession methodsFor: 'private' stamp: 'JZCH 6/Mar/2026 16:35:09'!
 saveContentsOn: aStream
 	self currentIndex < 2 ifTrue: [^ self].
 	
@@ -249,13 +336,14 @@ initialize
 	outputs := OrderedCollection new.
 	sharedVariables := Dictionary new.! !
 
-!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 7/Mar/2026 15:57:31'!
+!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 8/Mar/2026 21:24:16'!
 initialize
 	super initialize.
 	
 	outputReadyPrivateNoREPL := false.
        runningPrivateNoREPL := false.
-	sessionPrivateNoREPL := REPLSession new.
+
+	sessionPrivateNoREPL := REPLSession new repl: self.
 	! !
 
 !StdIOReadEvalPrint methodsFor: 'private' stamp: 'JZCH 7/Mar/2026 16:19:21'!
@@ -295,9 +383,41 @@ endImmediately
 	runningPrivateNoREPL := false.
 	^ 'Loop force stopped - should use double terminator during normal use instead'! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 22:27:25'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 21:46:05'!
 help
 "Show help text"
+	<stdioreplcommand>
+    	^ 
+'Inputs are valid Smalltalk, except for the character marking end of input.
+No other special characters or keywords are parsed.
+Access instance with messages to ''self''.
+
+Usage:
+	self <command> [subcommand]
+
+Commands:
+	intro 				show quick help
+	help 				show this text
+	commands 			list my commands
+	sn 				session manager
+
+Reuse:
+	runPreviousInput 		reevaluate last input
+	runInputAt:			reevaluate input at index
+	previousOutput 			last output
+	outputAt: 			output at index
+	
+Others:
+	terminator: 			change character used to mark end of input
+					recommend limiting to ASCII Basic Latin (codePoint 31-126)
+					other characters may not be passed correctly by the VM/terminal
+					use only strictly when necessary, $!! is a good default
+	privateVariables: 		list of variables that should *not be* reassigned
+'! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 21:58:18'!
+intro
+"Show intro help text"
 	<stdioreplcommand>
 	|characterString|
 	characterString := self terminator asString.
@@ -306,28 +426,21 @@ help
 	Character newLineCharacter asString ,
 	characterString , characterString , ' to close REPL' , 
 	Character newLineCharacter asString ,
-	'Enter "self help!!" to show this message, "self commands!!" for a list of commands'  ,
+	'Enter "self help!!" for help, "self commands!!" for a list of commands
+	Enter "self intro!!" to show this message'  ,
 	Character newLineCharacter asString! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 22:27:58'!
-inputAt: index
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 21:58:01'!
+outputAt: anIndex
+"Convenience message"
 	<stdioreplcommand>
-	^ sessionPrivateNoREPL inputAt: index! !
+	^ self sn outputAt: anIndex! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 22:28:01'!
-outputAt: index
-	<stdioreplcommand>
-	^ sessionPrivateNoREPL outputAt: index! !
-
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 22:28:04'!
-previousInput
-	<stdioreplcommand>
-	^ sessionPrivateNoREPL previousInput! !
-
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 22:28:07'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 21:58:05'!
 previousOutput
+"Convenience message"
 	<stdioreplcommand>
-	^ sessionPrivateNoREPL previousOutput! !
+	^ self sn previousOutput! !
 
 !StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 16:26:22'!
 privateVariables
@@ -338,51 +451,26 @@ You should not need to read them directly. You should definitely not change them
 They are deliberately named contrary to Smalltalk convention to prevent accidental conflicts:' , 
 String newLineString , (self printWrapped: (self class instVarNames) every: 5)! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 22:28:11'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 20:41:11'!
 runInputAt: index
 	<stdioreplcommand>
-	^ self runInput: (self inputAt: index)
+	^ self runInput: (self sn inputAt: index)
 	! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 22:28:15'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 20:41:16'!
 runPreviousInput
 	<stdioreplcommand>
-	^ self runInput: self previousInput
+	^ self runInput: self sn previousInput
 	! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 6/Mar/2026 20:53:32'!
-saveContents
-"Saves the inputs and outputs to a file"
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 20:35:20'!
+sn
 	<stdioreplcommand>
-	| fileName |
-	fileName := 'Session: ' , DateAndTime now asString.
-	
-	self saveContentsTo: fileName asFileEntry.
-	^ 'Saved to ' , fileName asString! !
+	^ sessionPrivateNoREPL! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 22:28:21'!
-saveContentsTo: aFileEntry
-"Saves the contents to the given filename"
-	<stdioreplcommand>
-
-	aFileEntry writeStreamDo: [ :fileStream |
-		fileStream ifNotNil: [ 
-			sessionPrivateNoREPL saveContentsOn: fileStream ]].
-	^ 'Saved to ' , aFileEntry asString! !
-
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 22:26:43'!
-sharedVariableCommands
-"Returns a list of commands relating to use of shared variables"
-	<stdioreplcommand>
-	| pragmas selectors |
-	
-	pragmas := Pragma allNamed: #stdioreplbindingcommand in: self class.
-	selectors := pragmas collect: [:aPragma | aPragma selector].
-	^ self printWrapped: selectors every: 5! !
-
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 7/Mar/2026 15:57:31'!
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 8/Mar/2026 20:45:28'!
 currentIndex
-	^ sessionPrivateNoREPL currentIndex! !
+	^ self sn currentIndex! !
 
 !StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 7/Mar/2026 15:56:02'!
 outputReady
@@ -431,11 +519,11 @@ doClosingActions
 	stdOutPrivateNoREPL flush. self show: 'Exiting'. self show: String newLineString.
 	self quitSmalltalkOnClose ifTrue: [Smalltalk quit]! !
 
-!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 7/Mar/2026 15:57:31'!
+!StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 8/Mar/2026 21:19:48'!
 readEvalPrint
 	| line output |
 	
-       self show: self help.
+       self show: self intro.
        "Must be set immediately prior"
 	runningPrivateNoREPL := true.
 	[ line := self request: self prompt.
@@ -443,8 +531,8 @@ readEvalPrint
 	  line size = 0
 	] whileFalse: [
 		output := [ self runInput: line ] ifError: [ :err :ex | err ].
-		sessionPrivateNoREPL addInput: line.
-		sessionPrivateNoREPL addOutput: output.
+		self sn addInput: line.
+		self sn addOutput: output.
 		self show: output.
 		self show: String newLineString.
 		outputReadyPrivateNoREPL := true.
@@ -471,42 +559,6 @@ request: prompt
 show: anObject
 
 	stdOutPrivateNoREPL nextPutAll: anObject asString! !
-
-!StdIOReadEvalPrint methodsFor: 'binding' stamp: 'JZCH 7/Mar/2026 22:30:15'!
-assignTo: aName value: aValue
-	<stdioreplcommand>
-	<stdioreplbindingcommand>
-	^ sessionPrivateNoREPL assignTo: aName value: aValue! !
-
-!StdIOReadEvalPrint methodsFor: 'binding' stamp: 'JZCH 7/Mar/2026 22:30:19'!
-declare: aName
-	<stdioreplcommand>
-	<stdioreplbindingcommand>
-	^ sessionPrivateNoREPL declare: aName! !
-
-!StdIOReadEvalPrint methodsFor: 'binding' stamp: 'JZCH 7/Mar/2026 22:30:24'!
-hasDeclared: aName
-	<stdioreplcommand>
-	<stdioreplbindingcommand>
-	^ sessionPrivateNoREPL hasDeclared: aName! !
-
-!StdIOReadEvalPrint methodsFor: 'binding' stamp: 'JZCH 7/Mar/2026 22:30:28'!
-sharedVariables
-	<stdioreplcommand>
-	<stdioreplbindingcommand>
-	^ sessionPrivateNoREPL sharedVariables! !
-
-!StdIOReadEvalPrint methodsFor: 'binding' stamp: 'JZCH 7/Mar/2026 22:30:33'!
-sharedVariablesDo: aBlock
-	<stdioreplcommand>
-	<stdioreplbindingcommand>
-	sessionPrivateNoREPL sharedVariablesDo: aBlock! !
-
-!StdIOReadEvalPrint methodsFor: 'binding' stamp: 'JZCH 7/Mar/2026 22:30:38'!
-valueOf: aName
-	<stdioreplcommand>
-	<stdioreplbindingcommand>
-	^ sessionPrivateNoREPL valueOf: aName! !
 
 !StdIOReadEvalPrint class methodsFor: 'instance creation' stamp: 'JZCH 5/Mar/2026 22:32:23'!
 newWithDefaults
