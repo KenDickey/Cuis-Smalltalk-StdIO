@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 8 March 2026 at 9:58:42 pm'!
+'From Cuis7.6 [latest update: #7777] on 9 March 2026 at 3:30:06 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 23!
+!provides: 'StdIO' 1 24!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -62,14 +62,14 @@ Shared variables can be created for use between inputs using the messages under 
 
 Shared variables must be named using #Symbols.!
 
-!StdIOReadEvalPrint commentStamp: 'JZCH 7/Mar/2026 22:02:08' prior: 0!
+!StdIOReadEvalPrint commentStamp: 'JZCH 9/Mar/2026 15:12:22' prior: 0!
 Very simple Read Eval Print Loop (REPL) for standard input & output.
 
 I can be accessed using "self". E.g. send 'self help' or 'self commands' from the REPL.
 
 Shared variables can be declared using messages under the 'binding' category. Share variable names must be #Symbols.
 
-I keep a copy of previous inputs and outputs. Inputs can be rerun, e.g. self runPreviousInput, self runInputAt: 1. Outputs can be reused, e.g. self previousOutput, self outputAt: 1.
+I keep a copy of previous inputs and outputs. Inputs can be rerun, e.g. self rerun, self rerun: 1. Outputs can be reused, e.g. self reuse, self reuse: 1.
 
 Block closures can be created either as output or as shared variable for reuse. 
 
@@ -383,7 +383,7 @@ endImmediately
 	runningPrivateNoREPL := false.
 	^ 'Loop force stopped - should use double terminator during normal use instead'! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 21:46:05'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 15:14:05'!
 help
 "Show help text"
 	<stdioreplcommand>
@@ -402,10 +402,10 @@ Commands:
 	sn 				session manager
 
 Reuse:
-	runPreviousInput 		reevaluate last input
-	runInputAt:			reevaluate input at index
-	previousOutput 			last output
-	outputAt: 			output at index
+	rerun 				reevaluate last input
+	rerun:				reevaluate input at index
+	reuse 				last output
+	reuse: 				output at index
 	
 Others:
 	terminator: 			change character used to mark end of input
@@ -430,18 +430,6 @@ intro
 	Enter "self intro!!" to show this message'  ,
 	Character newLineCharacter asString! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 21:58:01'!
-outputAt: anIndex
-"Convenience message"
-	<stdioreplcommand>
-	^ self sn outputAt: anIndex! !
-
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 21:58:05'!
-previousOutput
-"Convenience message"
-	<stdioreplcommand>
-	^ self sn previousOutput! !
-
 !StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 16:26:22'!
 privateVariables
 	<stdioreplcommand>
@@ -451,17 +439,29 @@ You should not need to read them directly. You should definitely not change them
 They are deliberately named contrary to Smalltalk convention to prevent accidental conflicts:' , 
 String newLineString , (self printWrapped: (self class instVarNames) every: 5)! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 20:41:11'!
-runInputAt: index
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 15:11:47'!
+rerun
+	<stdioreplcommand>
+	^ self runInput: self sn previousInput
+	! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 15:11:33'!
+rerun: index
 	<stdioreplcommand>
 	^ self runInput: (self sn inputAt: index)
 	! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 20:41:16'!
-runPreviousInput
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 15:13:02'!
+reuse
+"Convenience message"
 	<stdioreplcommand>
-	^ self runInput: self sn previousInput
-	! !
+	^ self sn previousOutput! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 15:13:08'!
+reuse: anIndex
+"Convenience message"
+	<stdioreplcommand>
+	^ self sn outputAt: anIndex! !
 
 !StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 20:35:20'!
 sn

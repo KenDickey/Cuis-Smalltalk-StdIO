@@ -14,8 +14,8 @@ Inputs are valid Smalltalk, except for the character marking end of input. No ot
 ````Smalltalk
   self help "Shows detailed help message"
   self commands "Shows a list of commands"
-  self previousOutput. self outputAt: aNumber "Retrieve an answer that can be interacted with as a Smalltalk object"
-  self runPreviousInput. self runInputAt: aNumber "Rerun a previous input"
+  self reuse. self reuse: aNumber "Retrieve an answer that can be interacted with as a Smalltalk object"
+  self rerun. self rerun: aNumber "Rerun a previous input"
 ````
 ### REPL Session Manager
 The session manager can be accessed with "self sn". Use session manager to access inputs and outputs. Declare and reuse shared variables. And save the REPL session to a text file.
@@ -39,7 +39,7 @@ Block Closures can be created and saved as either output or shared variable and 
 1 >  [:a :b | a * b]! "Save a block closure to the output"
 ...
 2 >  "Alias of self sn previousOutput"
-     (self previousOutput) value: 3 value: 5! 
+     (self reuse) value: 3 value: 5! 
 ...
 3 >  self sn assignTo: #aBlock value: [:a :b | a * b]! "Save a block closure to a shared variable"
 ...

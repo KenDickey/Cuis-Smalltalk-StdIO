@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 8 March 2026 at 9:46:30 pm'!
+'From Cuis7.6 [latest update: #7777] on 9 March 2026 at 3:30:08 pm'!
 'Description '!
-!provides: 'Tests-StdIO' 1 5!
+!provides: 'Tests-StdIO' 1 6!
 !requires: 'StdIO' 1 9 nil!
 SystemOrganization addCategory: #'Tests-StdIO'!
 
@@ -53,13 +53,13 @@ testEndImmediately
 	
 	self assert: [repl running not].! !
 
-!StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 8/Mar/2026 21:35:48'!
+!StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 9/Mar/2026 15:17:51'!
 testRerunInput
 "Inputs can be rerun"
 	| answer |
 	input nextPutAll: 
 	'1+1!!
-	self runPreviousInput!!
+	self rerun!!
 	'.
 	
 	input reset.
@@ -68,7 +68,7 @@ testRerunInput
 	
 	self assert: (answer = 2).! !
 
-!StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 8/Mar/2026 21:35:44'!
+!StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 9/Mar/2026 15:17:47'!
 testReuseBlockClosuresFromOutput
 "Block closures can be reused when saved to an output"
 	| answer |
@@ -83,7 +83,7 @@ testReuseBlockClosuresFromOutput
 	
 	self assert: (answer = 15).! !
 
-!StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 8/Mar/2026 21:35:41'!
+!StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 9/Mar/2026 15:17:43'!
 testReuseBlockClosuresFromSharedVariables
 "Block closures can be reused when saved to a shared variable"
 	| answer |
@@ -98,7 +98,7 @@ testReuseBlockClosuresFromSharedVariables
 	
 	self assert: (answer = 15).! !
 
-!StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 8/Mar/2026 21:35:37'!
+!StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 9/Mar/2026 15:17:40'!
 testReuseOutput
 "Outputs can be retrieved and used as Smalltalk Objects not just a string"
 	| answer |
@@ -113,7 +113,7 @@ testReuseOutput
 	
 	self assert: (answer = 2).! !
 
-!StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 8/Mar/2026 21:35:33'!
+!StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 9/Mar/2026 15:17:34'!
 testSharedVariableScope
 "Shared variables are useable within the session"
 	| answer |
@@ -141,7 +141,7 @@ testSingleTerminator
 	
 	self assert: repl outputReady.! !
 
-!StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 8/Mar/2026 21:35:20'!
+!StdIOReadEvalPrintTest methodsFor: 'tests' stamp: 'JZCH 9/Mar/2026 15:17:26'!
 testTempVariablesScope
 "Temp variables declared in each 'line' of the REPL are accessible only in that line. They are equivalent to private variables within a method"
 	| answer |
