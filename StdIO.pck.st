@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 9 March 2026 at 3:30:06 pm'!
+'From Cuis7.6 [latest update: #7777] on 9 March 2026 at 8:43:33 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 24!
+!provides: 'StdIO' 1 27!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -27,7 +27,7 @@ REPLSession class
 
 !classDefinition: #StdIOReadEvalPrint category: #StdIO!
 Object subclass: #StdIOReadEvalPrint
-	instanceVariableNames: 'stdInPrivateNoREPL stdOutPrivateNoREPL terminatorPrivateNoREPL runningPrivateNoREPL outputReadyPrivateNoREPL sessionPrivateNoREPL'
+	instanceVariableNames: 'stdInPrivateNoREPL stdOutPrivateNoREPL terminatorPrivateNoREPL runningPrivateNoREPL outputReadyPrivateNoREPL sessionPrivateNoREPL quitSmalltalkOnExit stdOutWidthPrivateNoREPL'
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'StdIO'!
@@ -204,7 +204,7 @@ valueOf: aName
 	<stdioreplcommand>
 	^ sharedVariables at: aName! !
 
-!REPLSession methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 21:04:58'!
+!REPLSession methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 20:41:18'!
 commands
 "Returns a list of my commands"
 	<stdioreplcommand>
@@ -212,7 +212,7 @@ commands
 	
 	pragmas := Pragma allNamed: #stdioreplcommand in: self class.
 	selectors := pragmas collect: [:aPragma | aPragma selector].
-	^ self repl printWrapped: selectors every: 5! !
+	^ self repl printWrappedToWidth: selectors! !
 
 !REPLSession methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 21:41:33'!
 help
@@ -336,19 +336,36 @@ initialize
 	outputs := OrderedCollection new.
 	sharedVariables := Dictionary new.! !
 
-!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 8/Mar/2026 21:24:16'!
+!StdIOReadEvalPrint methodsFor: 'initialization' stamp: 'JZCH 9/Mar/2026 20:07:19'!
 initialize
 	super initialize.
 	
 	outputReadyPrivateNoREPL := false.
        runningPrivateNoREPL := false.
+	quitSmalltalkOnExit := false.
 
 	sessionPrivateNoREPL := REPLSession new repl: self.
 	! !
 
-!StdIOReadEvalPrint methodsFor: 'private' stamp: 'JZCH 7/Mar/2026 16:19:21'!
+!StdIOReadEvalPrint methodsFor: 'private' stamp: 'JZCH 9/Mar/2026 20:36:16'!
+printWrapped: aCollectionOfStrings before: aNumber
+"Terminal may not auto wrap output. Wrap line before a certain number of characters is exceeded"
+	| count return |
+	count := 0.
+	return := ''.
+	aCollectionOfStrings do: [:aString | |length|
+		length := aString size.
+		(count + length) > aNumber ifTrue: [
+			return := return , Character lf asString.
+			count := 0].
+		count := count + length + 1.
+		return := return , aString , ' '.
+	].
+	^ return! !
+
+!StdIOReadEvalPrint methodsFor: 'private' stamp: 'JZCH 9/Mar/2026 20:36:30'!
 printWrapped: aCollectionOfStrings every: aNumber
-"Terminal may not auto wrap output."
+"Terminal may not auto wrap output. Wrap line after a certain number of elements have been printed"
 	| count return |
 	count := 0.
 	return := ''.
@@ -361,12 +378,17 @@ printWrapped: aCollectionOfStrings every: aNumber
 	].
 	^ return! !
 
+!StdIOReadEvalPrint methodsFor: 'private' stamp: 'JZCH 9/Mar/2026 20:40:54'!
+printWrappedToWidth: aCollectionOfStrings
+"Terminal may not auto wrap output. Wrap line before width of the output is exceeded"
+	^ self printWrapped: aCollectionOfStrings before: self stdOutWidth! !
+
 !StdIOReadEvalPrint methodsFor: 'private' stamp: 'JZCH 6/Mar/2026 19:55:51'!
 runInput: aString
 "Do not call this manually!!"
 	^ Compiler evaluate: aString for: self logged: false! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 22:27:30'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 20:41:33'!
 commands
 "Returns a list of my commands intended for the REPL"
 	<stdioreplcommand>
@@ -374,7 +396,7 @@ commands
 	
 	pragmas := Pragma allNamed: #stdioreplcommand in: self class.
 	selectors := pragmas collect: [:aPragma | aPragma selector].
-	^ self printWrapped: selectors every: 5! !
+	^ self printWrappedToWidth: selectors! !
 
 !StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 22:27:47'!
 endImmediately
@@ -415,7 +437,7 @@ Others:
 	privateVariables: 		list of variables that should *not be* reassigned
 '! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 8/Mar/2026 21:58:18'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 20:30:03'!
 intro
 "Show intro help text"
 	<stdioreplcommand>
@@ -424,20 +446,21 @@ intro
     	^ 
 	'End Smalltalk espressions with ' , characterString , ' and press enter to evaluate' , 
 	Character newLineCharacter asString ,
-	characterString , characterString , ' to close REPL' , 
+	characterString , characterString , ' to close REPL, Smalltalk quits as well: ' , 
+	quitSmalltalkOnExit asString , 
 	Character newLineCharacter asString ,
 	'Enter "self help!!" for help, "self commands!!" for a list of commands
 	Enter "self intro!!" to show this message'  ,
 	Character newLineCharacter asString! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 7/Mar/2026 16:26:22'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 20:41:44'!
 privateVariables
 	<stdioreplcommand>
 	^ 
 'As the REPL is accessible via "self", all instance variables of the REPL are also accessible.
 You should not need to read them directly. You should definitely not change them from the REPL.
 They are deliberately named contrary to Smalltalk convention to prevent accidental conflicts:' , 
-String newLineString , (self printWrapped: (self class instVarNames) every: 5)! !
+String newLineString , (self printWrappedToWidth: (self class instVarNames))! !
 
 !StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 15:11:47'!
 rerun
@@ -482,16 +505,21 @@ prompt
 "Edit this to customise the prompt"
     ^ self currentIndex asString, ' ', self terminator asString, '> '! !
 
-!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 4/Mar/2026 20:33:34'!
-quitSmalltalkOnClose
-"Todo: Figure out how to run headless
-Set to true to shutdown vm when REPL closes. Not critical when running in GUI mode."
-	^ false | Smalltalk isHeadless! !
-
 !StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 7/Mar/2026 15:57:15'!
 running
 "Hook for testing and debugging"
     ^ runningPrivateNoREPL! !
+
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 9/Mar/2026 20:27:15'!
+setQuitSmalltalkOnExit
+"Issue: Smalltalk isHeadless doesn't appear to retrieve any VM flags, #vmOptionsDo: always end up with a nil array. The flags sent to image do nothing on MacOS, GUI starts as usual.
+
+To start a headless VM, send -headless flag to VM, prior to the image path.
+
+If the REPL exits with !!!!, the image is not closed properly and will complain next time it is opened in GUI mode. Must send Smalltalk quit!! to exit. Therefore, tell REPL when opened in headless VM mode it should quit the image on exit.
+
+Not critical when running in GUI mode."
+	quitSmalltalkOnExit := true! !
 
 !StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 7/Mar/2026 15:57:45'!
 stdIn: aFileStream
@@ -500,6 +528,14 @@ stdIn: aFileStream
 !StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 7/Mar/2026 15:57:57'!
 stdOut: aFileStream
 	stdOutPrivateNoREPL := aFileStream! !
+
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 9/Mar/2026 20:39:42'!
+stdOutWidth
+	^ stdOutWidthPrivateNoREPL ifNil: [stdOutWidthPrivateNoREPL := 110]! !
+
+!StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 9/Mar/2026 20:39:14'!
+stdOutWidth: aNumber
+	stdOutWidthPrivateNoREPL := aNumber! !
 
 !StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 7/Mar/2026 15:58:06'!
 terminator
@@ -514,10 +550,10 @@ Using anything outside of ASCII Basic Latin (codePoint 31-126) is unsafe. VM/Ter
     aCharacter isString ifTrue: [terminatorPrivateNoREPL := aCharacter first. ^ self].
     terminatorPrivateNoREPL := aCharacter! !
 
-!StdIOReadEvalPrint methodsFor: 'finalization' stamp: 'JZCH 7/Mar/2026 15:57:57'!
+!StdIOReadEvalPrint methodsFor: 'finalization' stamp: 'JZCH 9/Mar/2026 20:11:10'!
 doClosingActions
 	stdOutPrivateNoREPL flush. self show: 'Exiting'. self show: String newLineString.
-	self quitSmalltalkOnClose ifTrue: [Smalltalk quit]! !
+	quitSmalltalkOnExit ifTrue: [Smalltalk quit]! !
 
 !StdIOReadEvalPrint methodsFor: 'command line' stamp: 'JZCH 8/Mar/2026 21:19:48'!
 readEvalPrint
@@ -569,3 +605,7 @@ newWithDefaults
 	newInstance terminator: $!!.
 	
 	^ newInstance! !
+
+!StdIOReadEvalPrint class methodsFor: 'instance creation' stamp: 'JZCH 9/Mar/2026 20:12:30'!
+newWithDefaultsHeadless
+	^ self newWithDefaults setQuitSmalltalkOnExit! !
