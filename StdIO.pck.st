@@ -1,6 +1,6 @@
-'From Cuis7.6 [latest update: #7777] on 9 March 2026 at 8:43:33 pm'!
+'From Cuis7.6 [latest update: #7777] on 11 March 2026 at 12:32:54 pm'!
 'Description FileStreams for stdio.  Simple REPL for headless (unwindowed) execution.'!
-!provides: 'StdIO' 1 27!
+!provides: 'StdIO' 1 28!
 !requires: 'Cuis-Base' 76 7777 nil!
 SystemOrganization addCategory: #StdIO!
 
@@ -405,7 +405,7 @@ endImmediately
 	runningPrivateNoREPL := false.
 	^ 'Loop force stopped - should use double terminator during normal use instead'! !
 
-!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 15:14:05'!
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 21:26:46'!
 help
 "Show help text"
 	<stdioreplcommand>
@@ -428,6 +428,7 @@ Reuse:
 	rerun:				reevaluate input at index
 	reuse 				last output
 	reuse: 				output at index
+	use: 				shared variable #name, declared via session manager
 	
 Others:
 	terminator: 			change character used to mark end of input
@@ -435,6 +436,7 @@ Others:
 					other characters may not be passed correctly by the VM/terminal
 					use only strictly when necessary, $!! is a good default
 	privateVariables: 		list of variables that should *not be* reassigned
+	stdOutWidth: 			long lines should wrap before this is exceeded
 '! !
 
 !StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 20:30:03'!
@@ -490,6 +492,12 @@ reuse: anIndex
 sn
 	<stdioreplcommand>
 	^ sessionPrivateNoREPL! !
+
+!StdIOReadEvalPrint methodsFor: 'user interface' stamp: 'JZCH 9/Mar/2026 21:21:59'!
+use: aSymbol
+"Convenience message"
+	<stdioreplcommand>
+	^ self sn valueOf: aSymbol! !
 
 !StdIOReadEvalPrint methodsFor: 'accessing' stamp: 'JZCH 8/Mar/2026 20:45:28'!
 currentIndex
