@@ -43,5 +43,5 @@ Block Closures can be created and saved as either output or shared variable and 
 ...
 3 >  self sn assignTo: #aBlock value: [:a :b | a * b]! "Save a block closure to a shared variable"
 ...
-4 >  (self sn valueOf: #aBlock) value: 3 value: 5!
+4 >  (self use: #aBlock) value: 3 value: 5!
 ````
